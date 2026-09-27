@@ -1,0 +1,16 @@
+[ PDF Document ]
+       │
+       ▼
+ 1. pypdf / pymupdf (via langchain-community PyPDFLoader)
+       │  Extracts raw text from PDF pages into standard langchain-core Document objects
+       ▼
+ 2. langchain (TextSplitter)
+       │  Splits large text into smaller overlapping chunks
+       ▼
+ 3. langchain-community (Vector Store & Embeddings)
+       │  Converts text chunks to numeric vectors and stores them in a Vector Database (e.g., FAISS / Chroma)
+       ▼
+ 4. langchain & langchain-core (Retrieval Chain)
+       │  When a user asks a question, retrieves relevant text chunks from the vector store
+       ▼
+ 5. LLM (Generates final answer using retrieved context)

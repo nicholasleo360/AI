@@ -9,6 +9,6 @@ st.header("Research Tool Assistant")
 user_input = st.text_input("Ask your Question")
 
 if st.button("Summarize"):
-    model = ChatGoogleGenerativeAI(model="gemini-3.8-flash", temperature=0)
+    model = ChatGoogleGenerativeAI(model="gemini-3.5-flash", temperature=0)
     result = model.invoke(user_input)
     st.write(result.text)   
