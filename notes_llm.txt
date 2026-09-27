@@ -1,0 +1,145 @@
+Detailed explaination about transformer_block
+
+Here is a beginner-friendly, step-by-step breakdown of 
+
+transformer_block.py
+.
+
+🌟 High-Level Picture: What is a Transformer Block?
+Imagine you are reading a sentence:
+
+"The animal didn't cross the street because it was too tired."
+
+When your brain reads the word "it", you automatically know "it" refers to the animal, not the street.
+
+A Transformer Block is the exact building block inside models like ChatGPT that lets words "look at each other" to understand context and relationships.
+
+🧱 The 4 Components of transformer_block.py
+1. SelfAttentionHead (Single Attention Channel)
+This component calculates how much attention every word should pay to every other word in the sequence.
+
+python
+class SelfAttentionHead(nn.Module):
+    def __init__(self, embedding_dim, block_size, head_size):
+        ...
+        self.key = nn.Linear(embedding_dim, head_size, bias=False)
+        self.query = nn.Linear(embedding_dim, head_size, bias=False)
+        self.value = nn.Linear(embedding_dim, head_size, bias=False)
+        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+How it works using the Database Analogy:
+Query ($Q$): "What am I looking for?" (The current word asking a question).
+Key ($K$): "What content do I have?" (Other words advertising their meaning).
+Value ($V$): "Here is my actual information."
+Inside forward(self, x):
+Score Calculation (wei = q @ k.transpose(...)): Multiplying Query by Key finds which words match. High score = strong relationship.
+Masking (tril): In text generation, word #3 is not allowed to see word #4 or #5 (the future). The lower-triangular matrix tril masks future words out by setting their score to -\infty (negative infinity).
+Softmax (F.softmax): Converts scores into clean percentages (probabilities adding up to 100%).
+Output (wei @ v): Blends the Values together according to the attention percentages.
+2. MultiHeadAttention (A Team of Experts)
+Instead of just one attention mechanism, we run several SelfAttentionHeads in parallel.
+
+python
+class MultiHeadAttention(nn.Module):
+    def __init__(self, num_heads, head_size, embedding_dim, block_size):
+        ...
+        self.heads = nn.ModuleList([
+            SelfAttentionHead(embedding_dim, block_size, head_size) 
+            for _ in range(num_heads)
+        ])
+        self.proj = nn.Linear(head_size * num_heads, embedding_dim)
+Why use multiple heads?
+Head 1 might focus on grammar (linking verbs to nouns).
+Head 2 might focus on pronouns (linking "it" to "animal").
+Head 3 might focus on adjectives (linking "tired" to "animal").
+All heads run at the same time, their results are combined (torch.cat), and passed through a projection layer (self.proj).
+
+3. FeedForward (Individual Thinking Time)
+After words gather context from each other in Multi-Head Attention, each word goes through a small neural network independently to process and digest what it learned.
+
+python
+class FeedForward(nn.Module):
+    def __init__(self, embedding_dim):
+        ...
+        self.net = nn.Sequential(
+            nn.Linear(embedding_dim, 4 * embedding_dim),
+            nn.ReLU(),
+            nn.Linear(4 * embedding_dim, embedding_dim)
+        )
+It expands the representation size by 4x, applies non-linearity (ReLU), and compresses it back down.
+4. Block (The Complete Assembly Line)
+This class glues MultiHeadAttention and FeedForward together into a single reusable layer.
+
+python
+class Block(nn.Module):
+    ...
+    def forward(self, x):
+        x = x + self.sa_heads(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
+        return x
+
+Layer Normalization (self.ln1, self.ln2): Keeps values normalized (mean=0, variance=1) so numbers don't grow too large or blow up during deep network training.
+Residual / Skip Connections (x = x + ...): Adds the original input back to the output. This creates a "highway" for gradients to flow during backpropagation, making deep models easier to train.
+📊 Summary Flow Diagram
+Input Tokens (x)
+      │
+      ├───► LayerNorm ──► MultiHeadAttention ──┐
+      │                                         │
+      ▼                                         ▼
+   ( Add Original Input + Attention Output )  ◄─┘
+      │
+      ├───► LayerNorm ──► FeedForward Network ──┐
+      │                                         │
+      ▼                                         ▼
+   ( Add Intermediate Input + FeedForward Output ) ◄─┘
+      │
+      ▼
+Output Tokens
+
+
+
+
+Here is a detailed explanation of each of these Model Hyperparameters used for building and training a Transformer Language Model:
+
+1. block_size = 6 (Context Window / Sequence Length $T$)
+What it means: The maximum number of consecutive words/tokens the model can look back at to predict the next word.
+How it works:
+If the model receives 6 words: ["hello", "friends", "how", "are", "you", "<END>"], it uses them to predict the next word.
+In PyTorch, block_size determines the size of the Positional Embedding Matrix (nn.Embedding(block_size, embedding_dim)) and the attention mask matrix shape $(T \times T)$.
+2. embedding_dim = 32 (Hidden Dimension $d_{\text{model}}$ or $C$)
+What it means: The length of the numerical vector used to represent each word inside the neural network.
+How it works:
+Instead of treating a word as a single scalar number, the model converts each word ID into a 32-dimensional continuous vector via an embedding lookup table: $$\text{word ID } (5) \longrightarrow \begin{bmatrix} 0.12 & -0.45 & 0.89 & \dots & 0.31 \end{bmatrix}_{1 \times 32}$$
+A larger embedding_dim allows the model to capture more complex semantic relationships (e.g., GPT-3 uses 12288, while 32 is perfect for a small demo dataset).
+3. n_heads = 2 (Number of Attention Heads)
+What it means: The number of parallel Self-Attention mechanisms operating inside each Transformer block.
+How it works:
+The total embedding vector of dimension $32$ is split evenly among n_heads = 2.
+Each attention head operates on a sub-dimension size: $$d_{\text{head}} = \frac{\text{embedding_dim}}{\text{n_heads}} = \frac{32}{2} = 16$$
+Why multiple heads?
+Head 1 might focus on grammar/syntactic relationships (e.g., subject $\leftrightarrow$ verb).
+Head 2 might focus on contextual meaning (e.g., "tea" $\leftrightarrow$ "hot").
+4. n_layers = 2 (Transformer Block Depth)
+What it means: The number of sequential Transformer blocks stacked on top of each other.
+How it works:
+Each layer consists of:
+Multi-Head Self-Attention Layer
+Feed-Forward Neural Network (MLP)
+Layer 1 extracts low-level patterns, while Layer 2 builds higher-level abstract understanding from Layer 1's outputs.
+5. lr = 1e-3 (Learning Rate $\alpha$)
+What it means: The step size used by the optimizer (like AdamW) to update the model weights during backpropagation.
+Scientific notation: $1\text{e-}3 = 10^{-3} = 0.001$.
+Impact:
+If $\alpha$ is too high, training becomes unstable or diverges.
+If $\alpha$ is too low, training takes extremely long to learn.
+$0.001$ is the standard, well-tested starting learning rate for Adam/AdamW.
+6. epochs = 1500 (Training Iterations)
+What it means: The total number of complete optimization steps (or full dataset passes) the model will run during training.
+Why 1500?: Because your dataset is small (10 sentences), running 1,500 iterations ensures the model converges fully, minimizing loss down close to zero so it can generate sentences reliably.
+Summary Table
+Hyperparameter	Value	Role in Transformer Architecture
+block_size	6	Maximum context length / sequence window size ($T$)
+embedding_dim	32	Feature vector size representing each token ($C$)
+n_heads	2	Parallel self-attention heads ($h$), head dim = 16
+n_layers	2	Number of stacked Transformer blocks
+lr	0.001	Optimization step size for weight updates
+epochs	1500	Total training iterations
