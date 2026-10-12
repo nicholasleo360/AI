@@ -1,4 +1,4 @@
-from langchain_core import tool
+from langchain_core.tools import tool
 
 
 @tool
@@ -15,7 +15,7 @@ def add( a, b ) :
     """
     return a + b
 
-Class MathToolKit : 
+class MathToolKit : 
     name = "math_tool_kit"
     description = "use this to do math operations"
     def get_tools(self) :
